@@ -1,0 +1,608 @@
+from tkinter import *
+from tkinter import messagebox, ttk
+import customtkinter as ctk
+from FUNCTIONS import *
+from customtkinter import set_appearance_mode, set_default_color_theme
+
+# Set appearance and theme
+set_appearance_mode("System")  # Options: "Light", "Dark", "System"
+set_default_color_theme("blue")  # Still required for button colors
+
+# Color Constants
+THEME_COLOR = "#26547C"
+ACCENT_COLOR = "white"
+FONT_COLOR = "#4A90E2"
+PLACEHOLDER_COLOR = "#A9A9A9"
+FONT_SIZE = 12
+
+
+class MainWindow(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Farmers Cubao")
+        self.geometry("800x550")
+        self.configure(fg_color=THEME_COLOR)
+        self.resizable(False, False)
+        self.init_ui()
+
+    def init_ui(self):
+        # Image Label (Placeholder)
+        self.image_label = ctk.CTkLabel(self, text="[Image Not Found]",
+                                        fg_color="transparent",
+                                        text_color=ACCENT_COLOR,
+                                        font=("Arial", 16, "bold"))
+        self.image_label.place(x=330, y=150)
+
+        # Username Entry
+        self.user_id_input = ctk.CTkEntry(self, font=("Arial", 14), width=200, height=30, text_color="black")
+        self.user_id_input.insert(0, "Please enter your username")
+        self.user_id_input.place(x=300, y=250)
+        self.user_id_input.bind("<FocusIn>", self.clear_placeholder_username)
+        self.user_id_input.bind("<FocusOut>", self.add_placeholder_username)
+
+        # Password Entry
+        self.password_input = ctk.CTkEntry(self, font=("Arial", 14), width=200, height=30, text_color="black")
+        self.password_input.insert(0, "Please enter your password")
+        self.password_input.place(x=300, y=300)
+        self.password_input.bind("<FocusIn>", self.clear_placeholder_password)
+        self.password_input.bind("<FocusOut>", self.add_placeholder_password)
+
+        # Login Button
+        self.login_button = ctk.CTkButton(self, text="Login", command=self.login_function,
+                                          fg_color=ACCENT_COLOR, text_color=FONT_COLOR,
+                                          font=("Arial", 14), width=105, height=40)
+        self.login_button.place(x=290, y=350)
+
+        # Sign Up Button
+        self.signup_button = ctk.CTkButton(self, text="Sign Up", command=lambda: SignUpWindow(self),
+                                           fg_color=ACCENT_COLOR, text_color=FONT_COLOR,
+                                           font=("Arial", 14), width=105, height=40)
+        self.signup_button.place(x=410, y=350)
+
+    def clear_placeholder_username(self, event):
+        if self.user_id_input.get() == "Please enter your username":
+            self.user_id_input.delete(0, END)
+
+    def add_placeholder_username(self, event):
+        if not self.user_id_input.get():
+            self.user_id_input.insert(0, "Please enter your username")
+
+    def clear_placeholder_password(self, event):
+        if self.password_input.get() == "Please enter your password":
+            self.password_input.delete(0, END)
+            self.password_input.configure(show="*")
+
+    def add_placeholder_password(self, event):
+        if not self.password_input.get():
+            self.password_input.configure(show="")
+            self.password_input.insert(0, "Please enter your password")
+
+    def login_function(self):
+        username = self.user_id_input.get()
+        password = self.password_input.get()
+
+        if username == "Please enter your username" or password == "Please enter your password":
+            messagebox.showerror("Login Failed", "Please enter both username and password.")
+            return
+
+        information = Login(username, password)
+
+        if not information:
+            messagebox.showerror("Login Failed", "Invalid username or password.")
+            return
+
+        user_ID = information[0]
+        userNAME = information[2]
+        role = information[1]
+
+        if role == "Consumer":
+            self.create_consumer_dashboard(user_ID, userNAME)
+        elif role == "Seller":
+            self.create_seller_dashboard(user_ID, userNAME)
+        elif role == "Admin":
+            self.create_admin_dashboard(user_ID, userNAME)
+        else:
+            messagebox.showerror("Login Failed", "Invalid role assigned to user.")
+
+    def create_admin_dashboard(self, user_ID, userNAME):
+        admin_window = ctk.CTkToplevel(self)
+        admin_window.title("Admin Dashboard")
+        admin_window.geometry("800x600")
+        admin_window.configure(fg_color=THEME_COLOR)
+        admin_window.resizable(False, False)
+
+        def refresh_users():
+            users_tree.delete(*users_tree.get_children())
+            users = get_all_users()
+            if users:
+                for user in users:
+                    users_tree.insert('', 'end', values=(user[0], user[1], user[2]))
+
+        # Header
+        ctk.CTkLabel(admin_window, text=f"Welcome Admin, {userNAME}!", text_color=ACCENT_COLOR,
+                     font=("Arial", 20, "bold")).pack(pady=20)
+
+        # Users Treeview
+        users_frame = ctk.CTkFrame(admin_window)
+        users_frame.pack(pady=10, padx=20, fill='both', expand=True)
+
+        scrollbar = ttk.Scrollbar(users_frame)
+        scrollbar.pack(side='right', fill='y')
+
+        users_tree = ttk.Treeview(users_frame, columns=('ID', 'Username', 'Role'), show='headings',
+                                  yscrollcommand=scrollbar.set)
+        users_tree.heading('ID', text='ID')
+        users_tree.heading('Username', text='Username')
+        users_tree.heading('Role', text='Role')
+        users_tree.column('ID', width=50, anchor='center')
+        users_tree.column('Username', width=200, anchor='center')
+        users_tree.column('Role', width=100, anchor='center')
+        users_tree.pack(fill='both', expand=True)
+
+        scrollbar.config(command=users_tree.yview)
+
+        # Buttons
+        button_frame = ctk.CTkFrame(admin_window, fg_color="transparent")
+        button_frame.pack(pady=10)
+
+        refresh_btn = ctk.CTkButton(button_frame, text="Refresh", command=refresh_users,
+                                    fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        refresh_btn.pack(side='left', padx=10)
+
+        logout_btn = ctk.CTkButton(button_frame, text="Logout", command=admin_window.destroy,
+                                   fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        logout_btn.pack(side='left', padx=10)
+
+        # Load initial data
+        refresh_users()
+
+    def create_seller_dashboard(self, user_ID, userNAME):
+        seller_window = ctk.CTkToplevel(self)
+        seller_window.title("Seller Dashboard")
+        seller_window.geometry("900x600")
+        seller_window.configure(fg_color=THEME_COLOR)
+        seller_window.resizable(False, False)
+
+        def refresh_products():
+            products_tree.delete(*products_tree.get_children())
+            products = get_seller_products(user_ID)
+            if products:
+                for product in products:
+                    products_tree.insert('', 'end', values=(product[0], product[2], product[3], product[4], product[5]))
+
+        def add_product():
+            add_window = ctk.CTkToplevel(seller_window)
+            add_window.title("Add Product")
+            add_window.geometry("400x300")
+            add_window.resizable(False, False)
+
+            ctk.CTkLabel(add_window, text="Product Name:").pack(pady=5)
+            name_entry = ctk.CTkEntry(add_window, width=300)
+            name_entry.pack(pady=5)
+
+            ctk.CTkLabel(add_window, text="Description:").pack(pady=5)
+            desc_entry = ctk.CTkEntry(add_window, width=300)
+            desc_entry.pack(pady=5)
+
+            ctk.CTkLabel(add_window, text="Price:").pack(pady=5)
+            price_entry = ctk.CTkEntry(add_window, width=300)
+            price_entry.pack(pady=5)
+
+            ctk.CTkLabel(add_window, text="Quantity:").pack(pady=5)
+            qty_entry = ctk.CTkEntry(add_window, width=300)
+            qty_entry.pack(pady=5)
+
+            def submit():
+                try:
+                    price = float(price_entry.get())
+                    qty = int(qty_entry.get())
+                    if add_product(user_ID, name_entry.get(), desc_entry.get(), price, qty):
+                        messagebox.showinfo("Success", "Product added successfully!")
+                        refresh_products()
+                        add_window.destroy()
+                    else:
+                        messagebox.showerror("Error", "Failed to add product")
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid price or quantity")
+
+            submit_btn = ctk.CTkButton(add_window, text="Submit", command=submit,
+                                       fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+            submit_btn.pack(pady=10)
+
+        def edit_product():
+            selected = products_tree.selection()
+            if not selected:
+                messagebox.showwarning("Warning", "Please select a product to edit")
+                return
+
+            product_id = products_tree.item(selected[0])['values'][0]
+            product_data = None
+            products = get_seller_products(user_ID)
+            if products:
+                for product in products:
+                    if product[0] == product_id:
+                        product_data = product
+                        break
+
+            if not product_data:
+                messagebox.showerror("Error", "Product not found")
+                return
+
+            edit_window = ctk.CTkToplevel(seller_window)
+            edit_window.title("Edit Product")
+            edit_window.geometry("400x300")
+            edit_window.resizable(False, False)
+
+            ctk.CTkLabel(edit_window, text="Product Name:").pack(pady=5)
+            name_entry = ctk.CTkEntry(edit_window, width=300)
+            name_entry.insert(0, product_data[2])
+            name_entry.pack(pady=5)
+
+            ctk.CTkLabel(edit_window, text="Description:").pack(pady=5)
+            desc_entry = ctk.CTkEntry(edit_window, width=300)
+            desc_entry.insert(0, product_data[3])
+            desc_entry.pack(pady=5)
+
+            ctk.CTkLabel(edit_window, text="Price:").pack(pady=5)
+            price_entry = ctk.CTkEntry(edit_window, width=300)
+            price_entry.insert(0, str(product_data[4]))
+            price_entry.pack(pady=5)
+
+            ctk.CTkLabel(edit_window, text="Quantity:").pack(pady=5)
+            qty_entry = ctk.CTkEntry(edit_window, width=300)
+            qty_entry.insert(0, str(product_data[5]))
+            qty_entry.pack(pady=5)
+
+            def submit():
+                try:
+                    price = float(price_entry.get())
+                    qty = int(qty_entry.get())
+                    if update_product(product_id, name_entry.get(), desc_entry.get(), price, qty):
+                        messagebox.showinfo("Success", "Product updated successfully!")
+                        refresh_products()
+                        edit_window.destroy()
+                    else:
+                        messagebox.showerror("Error", "Failed to update product")
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid price or quantity")
+
+            submit_btn = ctk.CTkButton(edit_window, text="Submit", command=submit,
+                                       fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+            submit_btn.pack(pady=10)
+
+        def delete_product():
+            selected = products_tree.selection()
+            if not selected:
+                messagebox.showwarning("Warning", "Please select a product to delete")
+                return
+
+            product_id = products_tree.item(selected[0])['values'][0]
+            if messagebox.askyesno("Confirm", "Are you sure you want to delete this product?"):
+                if delete_product(product_id):
+                    messagebox.showinfo("Success", "Product deleted successfully!")
+                    refresh_products()
+                else:
+                    messagebox.showerror("Error", "Failed to delete product")
+
+        # Header
+        ctk.CTkLabel(seller_window, text=f"Welcome Seller, {userNAME}!", text_color=ACCENT_COLOR,
+                     font=("Arial", 20, "bold")).pack(pady=20)
+
+        # Products Treeview
+        products_frame = ctk.CTkFrame(seller_window)
+        products_frame.pack(pady=10, padx=20, fill='both', expand=True)
+
+        scrollbar = ttk.Scrollbar(products_frame)
+        scrollbar.pack(side='right', fill='y')
+
+        products_tree = ttk.Treeview(products_frame,
+                                     columns=('ID', 'Name', 'Description', 'Price', 'Qty'),
+                                     show='headings',
+                                     yscrollcommand=scrollbar.set)
+        products_tree.heading('ID', text='ID')
+        products_tree.heading('Name', text='Name')
+        products_tree.heading('Description', text='Description')
+        products_tree.heading('Price', text='Price')
+        products_tree.heading('Qty', text='Quantity')
+        products_tree.column('ID', width=50, anchor='center')
+        products_tree.column('Name', width=150, anchor='center')
+        products_tree.column('Description', width=250, anchor='center')
+        products_tree.column('Price', width=100, anchor='center')
+        products_tree.column('Qty', width=80, anchor='center')
+        products_tree.pack(fill='both', expand=True)
+
+        scrollbar.config(command=products_tree.yview)
+
+        # Buttons
+        button_frame = ctk.CTkFrame(seller_window, fg_color="transparent")
+        button_frame.pack(pady=10)
+
+        add_btn = ctk.CTkButton(button_frame, text="Add Product", command=add_product,
+                                fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        add_btn.pack(side='left', padx=5)
+
+        edit_btn = ctk.CTkButton(button_frame, text="Edit Product", command=edit_product,
+                                 fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        edit_btn.pack(side='left', padx=5)
+
+        delete_btn = ctk.CTkButton(button_frame, text="Delete Product", command=delete_product,
+                                   fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        delete_btn.pack(side='left', padx=5)
+
+        refresh_btn = ctk.CTkButton(button_frame, text="Refresh", command=refresh_products,
+                                    fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        refresh_btn.pack(side='left', padx=5)
+
+        logout_btn = ctk.CTkButton(button_frame, text="Logout", command=seller_window.destroy,
+                                   fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        logout_btn.pack(side='left', padx=5)
+
+        # Load initial data
+        refresh_products()
+
+    def create_consumer_dashboard(self, user_ID, userNAME):
+        consumer_window = ctk.CTkToplevel(self)
+        consumer_window.title("Consumer Dashboard")
+        consumer_window.geometry("900x600")
+        consumer_window.configure(fg_color=THEME_COLOR)
+        consumer_window.resizable(False, False)
+
+        def refresh_products():
+            products_tree.delete(*products_tree.get_children())
+            products = get_all_products()
+            if products:
+                for product in products:
+                    products_tree.insert('', 'end', values=(
+                    product[0], product[1], product[2], product[3], product[4], product[5]))
+
+        def refresh_cart():
+            cart_tree.delete(*cart_tree.get_children())
+            cart_items = get_cart_items(user_ID)
+            if cart_items:
+                for item in cart_items:
+                    cart_tree.insert('', 'end', values=(item[0], item[2], item[3], item[4], item[5]))
+
+        def add_to_cart():
+            selected = products_tree.selection()
+            if not selected:
+                messagebox.showwarning("Warning", "Please select a product to add to cart")
+                return
+
+            product_id = products_tree.item(selected[0])['values'][0]
+            qty_window = ctk.CTkToplevel(consumer_window)
+            qty_window.title("Quantity")
+            qty_window.geometry("300x150")
+            qty_window.resizable(False, False)
+
+            ctk.CTkLabel(qty_window, text="Enter Quantity:").pack(pady=10)
+            qty_entry = ctk.CTkEntry(qty_window)
+            qty_entry.pack(pady=10)
+
+            def submit():
+                try:
+                    qty = int(qty_entry.get())
+                    if qty <= 0:
+                        messagebox.showerror("Error", "Quantity must be positive")
+                        return
+
+                    if add_to_cart(user_ID, product_id, qty):
+                        messagebox.showinfo("Success", "Product added to cart!")
+                        refresh_cart()
+                        qty_window.destroy()
+                    else:
+                        messagebox.showerror("Error", "Failed to add to cart")
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid quantity")
+
+            submit_btn = ctk.CTkButton(qty_window, text="Submit", command=submit,
+                                       fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+            submit_btn.pack(pady=10)
+
+        def remove_from_cart():
+            selected = cart_tree.selection()
+            if not selected:
+                messagebox.showwarning("Warning", "Please select an item to remove from cart")
+                return
+
+            cart_id = cart_tree.item(selected[0])['values'][0]
+            if remove_from_cart(cart_id):
+                messagebox.showinfo("Success", "Item removed from cart")
+                refresh_cart()
+            else:
+                messagebox.showerror("Error", "Failed to remove item from cart")
+
+        def checkout():
+            if not get_cart_items(user_ID):
+                messagebox.showwarning("Warning", "Your cart is empty")
+                return
+
+            if messagebox.askyesno("Confirm", "Proceed to checkout?"):
+                if checkout(user_ID):
+                    messagebox.showinfo("Success", "Checkout completed successfully!")
+                    refresh_cart()
+                    refresh_products()
+                else:
+                    messagebox.showerror("Error", "Checkout failed. Please check product availability.")
+
+        # Header
+        ctk.CTkLabel(consumer_window, text=f"Welcome Consumer, {userNAME}!", text_color=ACCENT_COLOR,
+                     font=("Arial", 20, "bold")).pack(pady=10)
+
+        # Products Frame
+        products_frame = ctk.CTkFrame(consumer_window)
+        products_frame.pack(pady=10, padx=20, fill='both', expand=True)
+
+        ctk.CTkLabel(products_frame, text="Available Products", text_color=ACCENT_COLOR,
+                     font=("Arial", 14, "bold")).pack()
+
+        products_scroll = ttk.Scrollbar(products_frame)
+        products_scroll.pack(side='right', fill='y')
+
+        products_tree = ttk.Treeview(products_frame,
+                                     columns=('ID', 'Name', 'Description', 'Price', 'Qty', 'Seller'),
+                                     show='headings',
+                                     yscrollcommand=products_scroll.set)
+        products_tree.heading('ID', text='ID')
+        products_tree.heading('Name', text='Name')
+        products_tree.heading('Description', text='Description')
+        products_tree.heading('Price', text='Price')
+        products_tree.heading('Qty', text='Quantity')
+        products_tree.heading('Seller', text='Seller')
+        products_tree.column('ID', width=50, anchor='center')
+        products_tree.column('Name', width=150, anchor='center')
+        products_tree.column('Description', width=200, anchor='center')
+        products_tree.column('Price', width=80, anchor='center')
+        products_tree.column('Qty', width=70, anchor='center')
+        products_tree.column('Seller', width=150, anchor='center')
+        products_tree.pack(fill='both', expand=True)
+
+        products_scroll.config(command=products_tree.yview)
+
+        # Cart Frame
+        cart_frame = ctk.CTkFrame(consumer_window)
+        cart_frame.pack(pady=10, padx=20, fill='both', expand=True)
+
+        ctk.CTkLabel(cart_frame, text="Your Cart", text_color=ACCENT_COLOR,
+                     font=("Arial", 14, "bold")).pack()
+
+        cart_scroll = ttk.Scrollbar(cart_frame)
+        cart_scroll.pack(side='right', fill='y')
+
+        cart_tree = ttk.Treeview(cart_frame,
+                                 columns=('ID', 'Name', 'Description', 'Price', 'Qty'),
+                                 show='headings',
+                                 yscrollcommand=cart_scroll.set)
+        cart_tree.heading('ID', text='ID')
+        cart_tree.heading('Name', text='Name')
+        cart_tree.heading('Description', text='Description')
+        cart_tree.heading('Price', text='Price')
+        cart_tree.heading('Qty', text='Quantity')
+        cart_tree.column('ID', width=50, anchor='center')
+        cart_tree.column('Name', width=150, anchor='center')
+        cart_tree.column('Description', width=200, anchor='center')
+        cart_tree.column('Price', width=80, anchor='center')
+        cart_tree.column('Qty', width=70, anchor='center')
+        cart_tree.pack(fill='both', expand=True)
+
+        cart_scroll.config(command=cart_tree.yview)
+
+        # Buttons
+        button_frame = ctk.CTkFrame(consumer_window, fg_color="transparent")
+        button_frame.pack(pady=10)
+
+        add_btn = ctk.CTkButton(button_frame, text="Add to Cart", command=add_to_cart,
+                                fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        add_btn.pack(side='left', padx=5)
+
+        remove_btn = ctk.CTkButton(button_frame, text="Remove from Cart", command=remove_from_cart,
+                                   fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        remove_btn.pack(side='left', padx=5)
+
+        checkout_btn = ctk.CTkButton(button_frame, text="Checkout", command=checkout,
+                                     fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        checkout_btn.pack(side='left', padx=5)
+
+        refresh_btn = ctk.CTkButton(button_frame, text="Refresh", command=lambda: [refresh_products(), refresh_cart()],
+                                    fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        refresh_btn.pack(side='left', padx=5)
+
+        logout_btn = ctk.CTkButton(button_frame, text="Logout", command=consumer_window.destroy,
+                                   fg_color=ACCENT_COLOR, text_color=FONT_COLOR)
+        logout_btn.pack(side='left', padx=5)
+
+        # Load initial data
+        refresh_products()
+        refresh_cart()
+
+
+class SignUpWindow(ctk.CTkToplevel):
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self.title("Sign Up")
+        self.geometry("450x320")
+        self.configure(fg_color=THEME_COLOR)
+        self.resizable(False, False)
+        self.init_ui()
+
+    def init_ui(self):
+        self.title_label = ctk.CTkLabel(self, text="Create an Account",
+                                      text_color=ACCENT_COLOR,
+                                      font=("Arial", 20, "bold"))
+        self.title_label.place(relx=0.5, y=20, anchor="center")
+
+        # Username Entry - width and height in constructor
+        self.username_input = ctk.CTkEntry(self, font=("Arial", 14), width=250, height=30,
+                                         text_color="black", placeholder_text="Create a username")
+        self.username_input.place(relx=0.5, y=75, anchor="center")
+        self.username_input.bind("<FocusIn>", self.clear_placeholder_username)
+        self.username_input.bind("<FocusOut>", self.add_placeholder_username)
+
+        # Password Entry - width and height in constructor
+        self.password_input = ctk.CTkEntry(self, font=("Arial", 14), width=250, height=30,
+                                          text_color="black", placeholder_text="Create a password",
+                                          show="")
+        self.password_input.place(relx=0.5, y=115, anchor="center")
+        self.password_input.bind("<FocusIn>", self.clear_placeholder_password)
+        self.password_input.bind("<FocusOut>", self.add_placeholder_password)
+
+        self.role_label = ctk.CTkLabel(self, text="Sign-up as?",
+                                     text_color=ACCENT_COLOR,
+                                     font=("Arial", FONT_SIZE))
+        self.role_label.place(relx=0.5, y=155, anchor="center")
+
+        # Role ComboBox - width and height in constructor
+        self.role_combo = ctk.CTkComboBox(self, values=["Consumer", "Seller", "Admin"],
+                                         font=("Arial", 14), state="readonly",
+                                         width=250, height=30)
+        self.role_combo.set("Consumer")
+        self.role_combo.place(relx=0.5, y=180, anchor="center")
+
+        # Submit Button - width and height in constructor
+        self.signup_button = ctk.CTkButton(self, text="Submit", command=self.submit_signup,
+                                         fg_color=ACCENT_COLOR, text_color=FONT_COLOR,
+                                         font=("Arial", 14), width=100, height=40)
+        self.signup_button.place(relx=0.5, y=250, anchor="center")
+
+        # Back Button - width and height in constructor
+        self.back_button = ctk.CTkButton(self, text="🡸", command=self.destroy,
+                                       fg_color=ACCENT_COLOR, text_color=FONT_COLOR,
+                                       font=("Arial", 14), width=50, height=30)
+        self.back_button.place(x=10, y=10)
+
+    def clear_placeholder_username(self, event):
+        if self.username_input.get() == "Create a username":
+            self.username_input.delete(0, END)
+
+    def add_placeholder_username(self, event):
+        if not self.username_input.get():
+            self.username_input.insert(0, "Create a username")
+
+    def clear_placeholder_password(self, event):
+        if self.password_input.get() == "Create a password":
+            self.password_input.delete(0, END)
+            self.password_input.configure(show="*")
+
+    def add_placeholder_password(self, event):
+        if not self.password_input.get():
+            self.password_input.configure(show="")
+            self.password_input.insert(0, "Create a password")
+
+    def submit_signup(self):
+        username = self.username_input.get()
+        password = self.password_input.get()
+        role = self.role_combo.get()
+
+        if username == "Create a username" or password == "Create a password":
+            messagebox.showerror("Error", "Please enter both username and password")
+            return
+
+        if SignUp(role, username, password):
+            messagebox.showinfo("Success", "Account created successfully!")
+            self.destroy()
+        else:
+            messagebox.showerror("Error", "Failed to create account. Username may already exist.")
+
+if __name__ == "__main__":
+    app = MainWindow()
+    app.mainloop()
