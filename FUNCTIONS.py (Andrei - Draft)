@@ -1,0 +1,243 @@
+import pyodbc
+
+DRIVER_NAME = "SQL Server"
+SERVER_NAME = r"DREIIUU\SQLEXPRESS"
+DATABASE_NAME = "DBMS_Project"
+
+# Establish connection
+try:
+    connect = pyodbc.connect(
+        f'DRIVER={DRIVER_NAME};'
+        f'SERVER={SERVER_NAME};'
+        f'DATABASE={DATABASE_NAME};'
+        'Trusted_Connection=yes;'
+    )
+except pyodbc.Error as e:
+    print(f"Database connection error: {e}")
+    connect = None
+
+
+def SignUp(Role_type, Username, User_pass):
+    if not connect:
+        print("No database connection available.")
+        return False
+
+    try:
+        cursor = connect.cursor()
+        # Check if username already exists
+        check_stmt = "SELECT Username FROM Users WHERE Username = ?"
+        cursor.execute(check_stmt, (Username,))
+        if cursor.fetchone():
+            print("Username already exists!")
+            return False
+
+        # Insert new user
+        query_stmt = "INSERT INTO Users (Role_type, Username, User_pass) VALUES (?, ?, ?)"
+        cursor.execute(query_stmt, (Role_type, Username, User_pass))
+        connect.commit()
+        print("Account created successfully!")
+        return True
+    except pyodbc.Error as ex:
+        print(f"Failed to create account: {ex}")
+        return False
+
+
+def Login(user, password):
+    if not connect:
+        print("No database connection available.")
+        return None
+
+    try:
+        cursor = connect.cursor()
+        query_stmt = "SELECT * FROM Users WHERE Username = ? and User_pass = ?"
+        USER = cursor.execute(query_stmt, (user, password)).fetchone()
+        return USER
+    except pyodbc.Error as ex:
+        print(f'Failed to login: {ex}')
+        return None
+
+
+# Admin Functions
+def get_all_users():
+    if not connect:
+        return None
+    try:
+        cursor = connect.cursor()
+        cursor.execute("SELECT User_ID, Username, Role_type FROM Users")
+        return cursor.fetchall()
+    except pyodbc.Error as ex:
+        print(f'Error fetching users: {ex}')
+        return None
+
+
+# Seller Functions
+def add_product(seller_id, name, description, price, quantity):
+    if not connect:
+        return False
+    try:
+        cursor = connect.cursor()
+        query = """
+        INSERT INTO Products (Seller_ID, Product_Name, Description, Price, Quantity) 
+        VALUES (?, ?, ?, ?, ?)
+        """
+        cursor.execute(query, (seller_id, name, description, price, quantity))
+        connect.commit()
+        return True
+    except pyodbc.Error as ex:
+        print(f'Error adding product: {ex}')
+        return False
+
+
+def get_seller_products(seller_id):
+    if not connect:
+        return None
+    try:
+        cursor = connect.cursor()
+        query = "SELECT * FROM Products WHERE Seller_ID = ?"
+        cursor.execute(query, (seller_id,))
+        return cursor.fetchall()
+    except pyodbc.Error as ex:
+        print(f'Error fetching products: {ex}')
+        return None
+
+
+def update_product(product_id, name, description, price, quantity):
+    if not connect:
+        return False
+    try:
+        cursor = connect.cursor()
+        query = """
+        UPDATE Products 
+        SET Product_Name = ?, Description = ?, Price = ?, Quantity = ?
+        WHERE Product_ID = ?
+        """
+        cursor.execute(query, (name, description, price, quantity, product_id))
+        connect.commit()
+        return True
+    except pyodbc.Error as ex:
+        print(f'Error updating product: {ex}')
+        return False
+
+
+def delete_product(product_id):
+    if not connect:
+        return False
+    try:
+        cursor = connect.cursor()
+        # First delete from any carts that have this product
+        cursor.execute("DELETE FROM Cart WHERE Product_ID = ?", (product_id,))
+        # Then delete the product
+        cursor.execute("DELETE FROM Products WHERE Product_ID = ?", (product_id,))
+        connect.commit()
+        return True
+    except pyodbc.Error as ex:
+        print(f'Error deleting product: {ex}')
+        return False
+
+
+# Consumer Functions
+def get_all_products():
+    if not connect:
+        return None
+    try:
+        cursor = connect.cursor()
+        query = """
+        SELECT p.Product_ID, p.Product_Name, p.Description, p.Price, p.Quantity, u.Username 
+        FROM Products p JOIN Users u ON p.Seller_ID = u.User_ID
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
+    except pyodbc.Error as ex:
+        print(f'Error fetching products: {ex}')
+        return None
+
+
+def add_to_cart(user_id, product_id, quantity):
+    if not connect:
+        return False
+    try:
+        cursor = connect.cursor()
+        # Check if product already in cart
+        check_query = "SELECT Quantity FROM Cart WHERE User_ID = ? AND Product_ID = ?"
+        cursor.execute(check_query, (user_id, product_id))
+        existing = cursor.fetchone()
+
+        if existing:
+            # Update quantity if already in cart
+            new_quantity = existing[0] + quantity
+            update_query = "UPDATE Cart SET Quantity = ? WHERE User_ID = ? AND Product_ID = ?"
+            cursor.execute(update_query, (new_quantity, user_id, product_id))
+        else:
+            # Add new item to cart
+            insert_query = "INSERT INTO Cart (User_ID, Product_ID, Quantity) VALUES (?, ?, ?)"
+            cursor.execute(insert_query, (user_id, product_id, quantity))
+
+        connect.commit()
+        return True
+    except pyodbc.Error as ex:
+        print(f'Error adding to cart: {ex}')
+        return False
+
+
+def get_cart_items(user_id):
+    if not connect:
+        return None
+    try:
+        cursor = connect.cursor()
+        query = """
+        SELECT c.Cart_ID, p.Product_ID, p.Product_Name, p.Description, p.Price, c.Quantity 
+        FROM Cart c JOIN Products p ON c.Product_ID = p.Product_ID 
+        WHERE c.User_ID = ?
+        """
+        cursor.execute(query, (user_id,))
+        return cursor.fetchall()
+    except pyodbc.Error as ex:
+        print(f'Error fetching cart items: {ex}')
+        return None
+
+
+def remove_from_cart(cart_id):
+    if not connect:
+        return False
+    try:
+        cursor = connect.cursor()
+        cursor.execute("DELETE FROM Cart WHERE Cart_ID = ?", (cart_id,))
+        connect.commit()
+        return True
+    except pyodbc.Error as ex:
+        print(f'Error removing from cart: {ex}')
+        return False
+
+
+def checkout(user_id):
+    if not connect:
+        return False
+    try:
+        cursor = connect.cursor()
+        # Get all cart items
+        cart_items = get_cart_items(user_id)
+        if not cart_items:
+            return False
+
+        # For each item, update product quantity
+        for item in cart_items:
+            product_id = item[1]
+            quantity = item[5]
+            # Get current product quantity
+            cursor.execute("SELECT Quantity FROM Products WHERE Product_ID = ?", (product_id,))
+            current_qty = cursor.fetchone()[0]
+            new_qty = current_qty - quantity
+            if new_qty < 0:
+                print(f"Not enough stock for product ID {product_id}")
+                return False
+
+            # Update product quantity
+            cursor.execute("UPDATE Products SET Quantity = ? WHERE Product_ID = ?", (new_qty, product_id))
+
+        # Clear the cart
+        cursor.execute("DELETE FROM Cart WHERE User_ID = ?", (user_id,))
+        connect.commit()
+        return True
+    except pyodbc.Error as ex:
+        print(f'Error during checkout: {ex}')
+        return False
